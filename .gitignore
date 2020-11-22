@@ -37,3 +37,9 @@ vignettes/*.pdf
 
 # R Environment Variables
 .Renviron
+
+# CSV files
+/*.csv
+
+# ZIP files
+/*.zip
