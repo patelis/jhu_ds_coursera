@@ -43,3 +43,7 @@ vignettes/*.pdf
 
 # ZIP files
 *.zip
+
+# TXT files
+
+*.txt
