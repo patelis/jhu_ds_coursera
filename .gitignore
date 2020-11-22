@@ -39,7 +39,7 @@ vignettes/*.pdf
 .Renviron
 
 # CSV files
-/*.csv
+*.csv
 
 # ZIP files
-/*.zip
+*.zip
