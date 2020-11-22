@@ -1,9 +1,12 @@
 # Script to clean and tidy the data for Human Activity Recognition Using Smartphones
 
-# Load libraries to tidy the data
+
+## Load libraries to tidy the data
 
 library(tidyverse) # Tidyverse includes packages like dplyr, tidyr and ggplot2
 library(here) # here package is used to easily navigate across directories, irrespective of OS
+
+## Set up paths and download the dataset if not already available in the folder
 
 path_to_project_folder <- here("3_Data_Cleaning", "Project")
 path_to_zip <- paste0(path_to_project_folder, "/getdata_projectfiles_UCI HAR Dataset.zip")
@@ -18,12 +21,12 @@ if (!file.exists(path_to_zip)) {
   
 }
 
-# Set up path 
+## Set up path to the datasets
 
 path <- paste0(path_to_project_folder, "/UCI HAR Dataset")
 
 
-# Read train data
+## Read train data
 
 train_x <- read_table2(paste0(path, "/train/X_train.txt"), col_names = FALSE, col_types = cols(
   .default = col_double()))
@@ -31,8 +34,10 @@ train_x <- read_table2(paste0(path, "/train/X_train.txt"), col_names = FALSE, co
 train_y <- read_table2(paste0(path, "/train/y_train.txt"), col_names = FALSE, col_types = cols(
   .default = col_double()))
 
+train_subject <- read_csv(paste0(path, "/train/subject_train.txt"), 
+                          col_names = FALSE)
 
-# Read test data
+## Read test data
 
 test_x <- read_table2(paste0(path, "/test/X_test.txt"), col_names = FALSE, col_types = cols(
   .default = col_double()))
@@ -40,11 +45,19 @@ test_x <- read_table2(paste0(path, "/test/X_test.txt"), col_names = FALSE, col_t
 test_y <- read_table2(paste0(path, "/test/y_test.txt"), col_names = FALSE, col_types = cols(
   .default = col_double()))
 
+test_subject <- read_csv(paste0(path, "/test/subject_test.txt"), 
+                          col_names = FALSE)
+
+
+## Combine train and test data for x, y and the subject info
+
 
 x <- bind_rows(train_x, test_x) # similar to rbind
 y <- bind_rows(train_y, test_y)
+subject <- bind_rows(train_subject, test_subject)
 
-# Read labels for x data and assign them to dataset
+
+## Read labels for x data, assign them and clean them
 
 x_labels <- read_table2(paste0(path, "/features.txt"), 
                         col_names = FALSE, 
@@ -57,4 +70,60 @@ x_labels <- read_table2(paste0(path, "/features.txt"),
   as.vector() %>% 
   flatten()
 
-colnames(x) <- x_labels
+colnames(x) <- x_labels %>% 
+  tolower() %>% 
+  str_replace_all("\\(", "") %>% 
+  str_replace_all("\\)", "") %>% 
+  str_replace_all("-", "_") %>% 
+  str_replace_all(",", "")
+
+
+## Assign names to the rest of the data
+
+colnames(y) <- "activity_id"
+
+colnames(subject) <- "subject_id"
+
+
+## 1. Merges the training and the test sets to create one data set.
+
+## Create a single data.frame (tibble) with all the data by combining all columns of equal length
+
+df <- bind_cols(subject, y, x) # similar to cbind
+  
+## 2. Extracts only the measurements on the mean and standard deviation for each measurement.
+
+df <- df %>% 
+  select(activity_id, subject_id, contains("mean"), contains("std")) # select only the columns of interest according to what is asked in the assignment
+
+
+## 3. Uses descriptive activity names to name the activities in the data set
+
+## Read and add the activity labels
+
+activity_labels <- read_table2(paste0(path, "/activity_labels.txt"), col_names = FALSE)
+
+colnames(activity_labels) <- c("activity_id", "activity_name")
+
+df <- df %>% 
+  left_join(activity_labels, by = "activity_id") %>% 
+  relocate("activity_name", .after = "activity_id")
+
+df <- df %>% 
+  relocate(c("activity_id", "activity_name"), .after = "subject_id") %>% 
+  mutate(activity_name = tolower(activity_name)) %>% 
+  arrange(subject_id, activity_id)
+
+
+## 5. From the data set in step 4, creates a second, independent tidy data set with the average of each variable for each activity and each subject.
+
+## Group the data.frame by each activity and each test subject and calculate the mean across all variables
+
+df_2 <- df %>% 
+  group_by(subject_id, activity_id, activity_name) %>% 
+  summarise(across(.cols = everything(), .fns = list(mean = mean), .names = "{.fn}_{.col}"), .groups = "drop")
+  
+
+## Remove raw datasets from the environment
+
+rm(activity_labels, subject, train_subject, test_subject, test_x, test_y, train_x, train_y, x, y, x_labels)
