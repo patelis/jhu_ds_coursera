@@ -1,0 +1,91 @@
+---
+title: "Coronavirus Map"
+author: "Konstantinos Patelis"
+date: "20/01/2021"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE, warning = FALSE, message = FALSE)
+```
+
+```{r libraries}
+
+library(tidyverse, verbose = FALSE)
+library(COVID19)
+library(leaflet)
+library(rnaturalearth)
+library(htmltools)
+
+```
+
+## `r Sys.Date() %>% as.Date("%Y-%m-%d") %>% format("%d-%B-%Y")`
+
+Below map shows the number of deaths from COVID19 per country. Click on a country to see more information.
+
+```{r data}
+
+data <- covid19(verbose = FALSE) %>% 
+  ungroup() %>% 
+  group_by(iso_alpha_3, longitude, latitude) %>% 
+  summarise(across(c("confirmed", "recovered", "deaths"), mean, na.rm = TRUE), .groups = "drop")
+
+world_polygons <- ne_countries(scale = "medium", returnclass = "sf") %>% 
+  select(iso_a3, geometry)
+
+df <- world_polygons %>% 
+  left_join(data, by = c("iso_a3" = "iso_alpha_3")) %>% 
+  select(iso_a3, longitude, latitude, 
+         confirmed, recovered, deaths, geometry)
+  
+pal <- colorBin(colorRamp(c("#E8C880", "#9A3D37")), domain = df$deaths)
+
+df_nest <- df %>% 
+  select(iso_a3, `Cases: ` = confirmed, `Deaths: ` = deaths, `Recovered: ` = recovered) %>% 
+  mutate(geometry = NULL) %>% 
+  as_tibble() %>% 
+  pivot_longer(where(is.numeric), names_to = "key", values_to = "value") %>% 
+  mutate(value = round(value)) %>% 
+  mutate(across(c("key", "value"), ~paste0("<b>", .x, "</b>"))) %>% 
+  group_by(iso_a3) %>% 
+  nest() %>% 
+  ungroup() %>% 
+  mutate(table = map(data,
+                     knitr::kable,
+                     format = "html",
+                     escape = FALSE,
+                     col.names = c("", "")), 
+          table = map(table,
+                      HTML)
+         ) %>% 
+  select(-data)
+
+df <- df %>% 
+  left_join(df_nest, by = "iso_a3")
+
+```
+
+```{r map}
+
+df %>% 
+  leaflet(width = "100%") %>% 
+  setView(lng = 8.54, lat = 47.38, zoom = 1.5) %>% 
+  addTiles() %>%
+  addPolygons(fillColor = ~pal(deaths),
+              opacity = 1,
+              dashArray = "3",
+              fillOpacity = 0.7,
+              color = "white",
+              weight = 1, 
+              highlight = highlightOptions(
+                weight = 1,
+                color = "#F5F5DC",
+                dashArray = "",
+                fillOpacity = 0.5,
+                bringToFront = TRUE
+                ),
+              popup = ~table)  %>%
+  addLegend(pal = pal, values = ~deaths, opacity = 0.7, title = NULL,
+    position = "bottomright")
+
+```

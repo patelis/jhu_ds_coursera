@@ -1,0 +1,48 @@
+---
+title: "COVID19 Evolution"
+author: "Konstantinos Patelis"
+date: "`r Sys.Date()`"
+output: ioslides_presentation
+---
+
+<!-- # COVID 19 Evolution -->
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE, warning = FALSE, message = FALSE)
+library(tidyverse, verbose = FALSE)
+library(plotly)
+library(COVID19)
+
+```
+
+## R Markdown
+
+Date: `r Sys.Date() `
+
+## Slide with R Output
+
+```{r plot, echo=FALSE}
+
+data <- covid19(verbose = FALSE) %>% 
+  mutate(date = as.Date(date, "%Y-%m-%d"))  
+  
+top8 <- data %>% 
+  summarise(top_sum = sum(confirmed, na.rm = TRUE), .groups = "drop") %>% 
+  arrange(desc(top_sum)) %>% 
+  slice_head(n = 8)
+
+df <- data %>% 
+  semi_join(top8, by = "id") %>% 
+  ungroup()
+
+p <- ggplot(df, aes(date, confirmed, colour = id)) + 
+  geom_line() + 
+  theme_bw() + 
+  labs(title = "Evolution of COVID19 Cases for most affected Countries", 
+       x = "", 
+       y = "Cumulative # of confirmed cases", 
+       colour = "Country")
+
+ggplotly(p)
+
+```
