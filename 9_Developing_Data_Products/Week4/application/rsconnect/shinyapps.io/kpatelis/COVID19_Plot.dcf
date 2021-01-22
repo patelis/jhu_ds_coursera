@@ -1,0 +1,12 @@
+name: COVID19_Plot
+title: COVID19_Plot
+username:
+account: kpatelis
+server: shinyapps.io
+hostUrl: https://api.shinyapps.io/v1
+appId: 3504414
+bundleId: 4127543
+url: https://kpatelis.shinyapps.io/COVID19_Plot/
+when: 1611270649.61701
+asMultiple: FALSE
+asStatic: FALSE
