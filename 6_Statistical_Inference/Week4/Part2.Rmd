@@ -1,0 +1,130 @@
+---
+title: "Analyzing Tooth Growth"
+author: "Konstantinos Patelis"
+date: "26/01/2021"
+output:
+  pdf_document: default
+  html_document:
+    df_print: paged
+---
+
+```{r setup, echo=FALSE, eval=TRUE, message=FALSE, warning=FALSE, include=FALSE}
+knitr::opts_chunk$set(
+	echo = FALSE, 
+	eval = TRUE
+)
+library(tidyverse)
+library(patchwork)
+```
+
+## Overview - Exploratory Analysis
+
+For this report we will have a look at the ToothGrowth dataset from the datasets package. Let's look at some summary statistics for the data and explore the data.
+
+```{r data}
+
+data <- datasets::ToothGrowth
+
+str(data)
+summary(data)
+data %>% group_by(supp, dose) %>% count()
+
+```
+
+The dataset contains sixty observations with three variables, two of which are numeric and one is a factor variable with two levels. The dose variable takes on three distinct values, so it might be more suited to be coded as a factor. Furthermore, there's an equal number of observations across all combinations of the supp and dose variables. The dose variable measures the dose of a vitamin provided in milligrams per day to the guinea pigs, while supp encodes the type of vitamin provided. The final variable, len, measures tooth length of the guinea pigs.
+
+```{r boxplots, fig.height=4}
+
+p1 <- ggplot(data, aes(x = factor(dose), y = len)) + 
+        geom_boxplot() + 
+        labs(
+          title = "Variation of Tooth Length by Dose Amount", 
+          x = "Dose (milligrams/day)", 
+          y = "Tooth Length"
+        )
+
+p2 <- ggplot(data, aes(x = supp, y = len)) + 
+        geom_boxplot() + 
+        labs(
+          title = "Variation of Tooth Length by Type of Vitamin", 
+          x = "Type of Vitamin", 
+          y = "Tooth Length"
+        )
+
+p1 / p2
+
+```
+
+Looking at the above figures, tooth length clearly seems to vary by the amount of vitamin provided to the guinea pig. Similarly, average tooth length is larger after receiving the OJ treatment. We can perform a t-test to conclude with more certainty whether the type of supplement and the dosage amount have an effect on tooth length.
+
+## Hypothesis testing
+
+We will perform separate t-tests to check whether there is a difference in average means of tooth length between:
+- different supplements
+- 0.5 vs 1 milligram dosage per day
+- 1 vs 2 milligram dosage per day
+- 0.5 vs 2 milligram dosage per day
+
+```{r t-test}
+
+t.test(data %>% filter(supp == "OJ") %>% pull(len), data %>% filter(supp == "VC") %>% pull(len))
+
+t.test(data %>% filter(dose == 0.5) %>% pull(len), data %>% filter(dose == 1) %>% pull(len))
+
+t.test(data %>% filter(dose == 1) %>% pull(len), data %>% filter(dose == 2) %>% pull(len))
+
+t.test(data %>% filter(dose == 0.5) %>% pull(len), data %>% filter(dose == 2) %>% pull(len))
+
+```
+
+We can see that there is not enough evidence to reject the hypothesis that means are different in the case of different supplements provided on the 95% confidence level; we would reject on a 90% confidence level. On the other hand, looking at the different t-tests for varying dosages, it is clear that the means are different, even on 99% confidence level.
+
+## Appendix
+
+```{r appendix, eval=FALSE, echo=TRUE}
+
+knitr::opts_chunk$set(
+	echo = FALSE, 
+	eval = TRUE
+)
+library(tidyverse)
+library(patchwork)
+
+data <- datasets::ToothGrowth
+
+str(data)
+summary(data)
+data %>% group_by(supp, dose) %>% count()
+
+p1 <- ggplot(data, aes(x = factor(dose), y = len)) + 
+        geom_boxplot() + 
+        labs(
+          title = "Variation of Tooth Length by Dose Amount", 
+          x = "Dose (milligrams/day)", 
+          y = "Tooth Length"
+        )
+
+p2 <- ggplot(data, aes(x = supp, y = len)) + 
+        geom_boxplot() + 
+        labs(
+          title = "Variation of Tooth Length by Type of Vitamin", 
+          x = "Type of Vitamin", 
+          y = "Tooth Length"
+        )
+
+p1 / p2
+
+t.test(data %>% filter(supp == "OJ") %>% pull(len), 
+       data %>% filter(supp == "VC") %>% pull(len))
+
+t.test(data %>% filter(dose == 0.5) %>% pull(len), 
+       data %>% filter(dose == 1) %>% pull(len))
+
+t.test(data %>% filter(dose == 1) %>% pull(len), 
+       data %>% filter(dose == 2) %>% pull(len))
+
+t.test(data %>% filter(dose == 0.5) %>% pull(len), 
+       data %>% filter(dose == 2) %>% pull(len))
+
+```
+
