@@ -1,0 +1,141 @@
+---
+title: "Analyzing Transmission Trends"
+author: "Konstantinos Patelis"
+date: "`r Sys.Date()`"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r libraries, include=FALSE}
+
+library(tidyverse)
+library(broom)
+library(corrr)
+library(patchwork)
+
+```
+
+## Executive Summary {#executive-summary}
+
+In this project we explore the relationship between the type of transmission and fuel efficiency in miles per gallon (mpg). To achieve this, we are using the `mtcars` dataset, seeking to answer whether automatic or manual transmission is better for fuel consumption, and to quantify this difference in consumption. We fit three models, the first one including most terms highly correlated with variable `mpg`, the second one reducing the number of variables using step-wise selection and the third one including an interaction term between `wt` and `am`. According to the third model, which seems to have the better fit, for weightless cars, manual transmissions would translate to higher efficiency, compared to cars with automatic transmissions with the same number of cylinders. In reality, cars up to a specific weight are more efficient with a manual transmission compared to cars with the same weight and number of cylinders that have automatic transmissions. Beyond that weight, cars with an automatic transmission are more efficient, compared to manual cars with the same characteristics.
+
+## Exploratory Analysis {#exploratory-analysis}
+
+Initially, we load the dataset and visualize whether there is a difference in fuel efficiency on average depending on the type of transmission, automatic (am = 0) or manual (am = 1). Our data contains information on miles/(US) gallon consumption (mpg), number of cylinders (cyl), weight in thousands of lbs (wt), etc.
+
+At first glance, looking at Plot A (appendix), it seems that, on average, cars with a manual transmission have higher fuel efficiency. However, it is possible that this is an indirect effect and that in reality MPG is affected by other variables that could be correlated to the transmission type. In Plot B we can observe the degree of correlation between the different variables in the dataset.
+
+It seems that mpg is negatively correlated with the number of cylinders, the engine displacement, the weight and horsepower, and positively correlated with the rear axle ratio, the engine shape and the type of transmission. However, the transmission type also seems to be negatively correlated with the number of cylinders, the displacement and the weight, and positively with the rear axle ratio. That could potentially mean that some of these variables affect both the type of transmission and the efficiency. Let's try fitting a linear model containing the variables that seem to be highly correlated with mpg. For modelling purposes, I will encode cyl, am and vs as factor variables. For the summary of the model, look at Model 1 in the appendix.
+
+Looking at the model's p-values, it seems that displacement, the engine shape, the rear axle ratio and actually our variable of interest, the transmission type seem to not be important in explaining fuel efficiency. Potentially, displacement is explained by the number of cylinders and the overall weight, while the rear axle ratio could also be dependent on the car's weight, design-wise. Furthermore, the engine shape could also be related to the number of cylinders, which would explain its low explanatory power in the model. We can try a step-wise model search to figure out what is the best simple model that captures the variability in the data. Looking at the simplified model (Model 2, appendix), it seems that the most of the variability in mpg can be explained by the weight and the number of cylinders, while the transmission type does not seem to be important as it is dropped by the model. Plotting the residuals against the predictors can show us if there was any pattern that was missed (Model 2 - Plot A, appendix). Furthermore, we can plot the predictors against the transmission type, to see if there is any form of interaction between them (Model 2 - Plot B, appendix). Looking at the latter, it appears that there is some interaction effect between weight and the transmission type. I will attempt to improve the existing model (Model 2), by adding an interaction between weight and the transmission. This might also help answer which transmission type is better for fuel efficiency (Model 3, appendix). I will also perform an ANOVA test between the three models, to check whether each improves upon the previous one. Using the `glance` function from the `broom` package (Model 2 and 3), we can see that several metrics that are used to evaluate models actually improve from model 2 to model 3, adjusted `R^2` increases, Akaike's (AIC) and Bayes' (BIC) information criterion both decrease. According to the ANOVA test (see ANOVA Test, appendix)
+
+Based on Model 3, all coefficients are significant with more that 99% certainty, with the exception of the coefficient of the dummy variable indicating the number of cylinders is six. If the car was weightless, then a manual transmission would translate to higher fuel efficiency, around 11.6 miles for a gallon. Considering there is an interaction term, the effect of manual transmission on efficiency depends on the weight of the vehicle. Since the coefficient of the interaction term is negative, a car with manual transmission would have lower efficiency as weight increases, compared to cars with automatic transmissions. For cars weighing less than 11.569 /  4.068 * 1000 lbs, which is around 2840 lbs (see Model 3, appendix), the car would be more fuel efficient if it has a manual transmission, compared to cars with automatic transmissions with the same number of cylinders and same weight. For cars above the specified weight, the car would be more efficient if it had an automatic transmission, for same number of cylinders and same weight.    
+
+## Appendix
+
+#### Plot A
+
+```{r boxplot, echo=FALSE, fig.align='left'}
+
+data <- mtcars
+
+ggplot(data %>% mutate(am = ifelse(am == 1, "Manual", "Automatic")), 
+       aes(x = factor(am), y = mpg, fill = factor(am))) + 
+  geom_boxplot() + 
+  theme_bw() + 
+  theme(legend.position = "none") + 
+  labs(x = "Transmission Type", 
+       y = "Miles / (US) gallon", 
+       title = "Relationship between MPG and type of Transmission")
+
+```
+
+#### Plot B
+
+```{r correlations, echo=FALSE, message=FALSE, warning=FALSE, fig.align='left'}
+
+cor_df <- data %>% correlate() %>% rearrange() %>% shave()
+
+rplot(cor_df, print_cor = TRUE, shape = 20, colours = c("red", "green"))
+```
+
+#### Model 1
+
+```{r model_one, echo=FALSE}
+
+data <- data %>% mutate(cyl = factor(cyl), 
+                        vs = factor(vs), 
+                        am = factor(am))
+
+
+mod1 <- lm(mpg ~ cyl + disp + wt + vs + drat + am, data = data)
+
+summary(mod1)
+```
+
+#### Model 2
+
+```{r model_two, echo=FALSE}
+
+mod2 <- step(mod1, k = log(nrow(mtcars)))
+
+summary(mod2)
+
+glance(mod2)
+
+```
+
+#### Model 2 - Plot A
+
+```{r model_two_plot_a, echo=FALSE, fig.align='left'}
+
+pred2 <- augment(mod2, newdata = data)
+
+p <- ggplot(pred2) + theme_bw()
+
+p1 <- p + geom_point(aes(wt, .resid)) + labs(title = "Residual Plots", y = "Residuals", x = "Weight")
+p2 <- p + geom_boxplot(aes(cyl, .resid, fill = cyl)) + labs(x = "# Cylinders" , y = NULL)
+
+# p1 <- p + geom_boxplot(aes(.resid, factor(am), colour = factor(am), fill = factor(am)))
+# p2 <- p + geom_point(aes(wt, .resid)) + facet_wrap(facets = vars(am), ncol = 2)
+
+p1 + p2 
+
+```
+
+#### Model 2 - Plot B
+
+```{r model_two_plot_b, echo=FALSE, fig.align='left'}
+
+p3 <- p + geom_point(aes(wt, .resid)) + facet_wrap(facets = vars(am), ncol = 2) + 
+  labs(title = "Residuals by Transmission Type", y = "Residuals", x = "Weight")
+p4 <- p + geom_boxplot(aes(cyl, .resid, fill = am)) + 
+  labs(x = "# Cylinders", y = NULL, fill = "Transmission Type") + 
+  theme(legend.position = "bottom")
+
+p3 + p4
+
+```
+
+#### Model 3
+
+```{r model_three, echo=FALSE}
+
+mod3 <- lm(mpg ~ cyl + wt * am, data = data)
+
+summary(mod3)
+
+glance(mod3)
+
+```
+
+#### ANOVA Test
+
+```{r anova}
+
+anova(mod1, mod2, mod3)
+
+```
